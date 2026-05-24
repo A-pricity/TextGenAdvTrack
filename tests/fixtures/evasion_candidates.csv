@@ -1,0 +1,5 @@
+candidate_id,parent_id,language,domain,source_model,prompt_type,rewrite_model,rewrite_type,semantic_score,proxy_score_1,proxy_score_2,selected,text
+c1,eva-001,zh,qa,Model-C1,question_answering,rule_rewriter,paraphrase,0.85,0.80,0.78,False,候选一
+c2,eva-001,zh,qa,Model-C1,question_answering,rule_rewriter,compress,0.90,0.82,0.40,False,候选二
+c3,eva-002,en,news,Model-O1,summary,rule_rewriter,paraphrase,0.80,0.75,0.75,False,Candidate one
+c4,eva-002,en,news,Model-O1,summary,rule_rewriter,expand,0.90,0.75,0.75,False,Candidate two

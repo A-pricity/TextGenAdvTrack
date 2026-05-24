@@ -1,0 +1,4 @@
+sample_id,language,domain,label,text_type,source_name,source_model,prompt_type,prompt_id,rewrite_type,parent_id,text
+zh-human-0001,zh,qa,1,human,human_zh_qa,,,,,,中文人类文本
+en-human-0001,en,qa,1,human,human_en_qa,,,,,,English human text
+ru-human-0001,ru,qa,1,human,human_ru_qa,,,,,,Русский человеческий текст

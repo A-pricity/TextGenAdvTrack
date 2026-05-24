@@ -1,0 +1,16 @@
+.env
+.venv/
+.uv-cache/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.log
+
+# Local scratch and package-manager logs
+=1.1.0
+tmp*/
+
+# Generated artifacts
+models/
+outputs/

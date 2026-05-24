@@ -1,0 +1,4 @@
+sample_id,language,domain,label,text_type,source_name,source_model,prompt_type,prompt_id,rewrite_type,parent_id,text
+zh-re-0001,zh,qa,0,ai_rewritten,self_generated,Model-C1,question_answering,zh_qa_001,paraphrase,zh-ai-0001,中文改写机器文本
+en-re-0001,en,qa,0,ai_rewritten,self_generated,Model-C2,question_answering,en_qa_001,paraphrase,en-ai-0001,English rewritten machine text
+ru-re-0001,ru,qa,0,ai_rewritten,self_generated,Model-O1,question_answering,ru_qa_001,paraphrase,ru-ai-0001,Русский переписанный машинный текст

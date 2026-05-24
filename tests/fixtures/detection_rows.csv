@@ -1,0 +1,5 @@
+sample_id,split,language,domain,label,text_type,source_name,source_model,prompt_type,prompt_id,rewrite_type,parent_id,text
+det-0001,train,zh,qa,1,human,public_human,,,,,,人工撰写文本一
+det-0002,train,zh,qa,0,ai_original,self_generated,Model-C1,question_answering,p-001,,,机器文本一
+det-0003,train,en,news,0,ai_rewritten,self_generated,Model-O1,summary,p-002,compress,det-0002,Rewritten machine text
+det-0004,train,ru,daily,1,human,public_human,,,,,,Человеческий текст

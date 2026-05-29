@@ -6,6 +6,7 @@ from textgenadvtrack.evasion.export import build_evasion_submission
 from textgenadvtrack.evasion.generate_candidates import generate_candidates
 from textgenadvtrack.evasion.select_candidates import choose_best_candidate
 from textgenadvtrack.evasion.select_candidates import score_and_select_candidates
+from textgenadvtrack.evasion.validation import validate_evasion_submission
 
 
 def test_choose_best_candidate_prefers_joint_proxy_gain():
@@ -111,3 +112,24 @@ def test_build_evasion_submission_maps_machine_only_ids_without_human_offset(tmp
     frame = pd.read_csv(output_csv)
     assert frame.iloc[0]["text"] == "Human first"
     assert frame.iloc[1]["text"] == "Rewritten machine second"
+
+
+def test_validate_evasion_submission_checks_alignment_and_human_preservation(tmp_path):
+    official_csv = tmp_path / "official.csv"
+    official_csv.write_text(
+        "prompt,text,label\n"
+        "human prompt,Human first,1\n"
+        "machine prompt,Machine second,0\n"
+    )
+    submission_csv = tmp_path / "submission.csv"
+    submission_csv.write_text(
+        "prompt,text\n"
+        "human prompt,Human first\n"
+        "machine prompt,Rewritten machine second\n"
+    )
+
+    result = validate_evasion_submission(official_csv, submission_csv)
+
+    assert result["status"] == "ok"
+    assert result["rows"] == 2
+    assert result["changed_machine_rows"] == 1

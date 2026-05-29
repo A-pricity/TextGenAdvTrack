@@ -12,6 +12,33 @@ pip install -e .
 
 Install a CUDA-enabled PyTorch build on the server before transformer training.
 
+For the reproducible end-to-end path, use the one-click runner:
+
+```bash
+nohup bash scripts/run_detection_one_click.sh > logs/one_click_xlmr.log 2>&1 &
+tail -f logs/one_click_xlmr.log
+```
+
+If the server cannot reach HuggingFace, put the pretrained model under the repo and point to it explicitly:
+
+```bash
+MODEL_NAME=pretrained/xlm-roberta-base \
+nohup bash scripts/run_detection_one_click.sh > logs/one_click_xlmr.log 2>&1 &
+```
+
+The runner trains, scores the dev split, exports `outputs/detection/submissions/textgenadvtrack_test1_xlmr.xlsx`,
+and validates the final Excel row count, headers, score range, prompt alignment, and required sheets.
+
+For stratified 10-fold model averaging:
+
+```bash
+MODE=cv CV_FOLDS=10 \
+nohup bash scripts/run_detection_one_click.sh > logs/one_click_xlmr_cv.log 2>&1 &
+```
+
+Ten-fold training is not required for a valid submission and costs roughly 10x one run. Use it when the single model
+has already completed cleanly and there is enough server time.
+
 ## 1. Reliable Validation
 
 Create repeated official validation splits:
@@ -140,6 +167,26 @@ If you add a public or external corpus, normalize it first and keep the raw sour
 ```
 
 ## 5. Evasion Risk
+
+Run the Evasion pipeline after at least one detector model is available:
+
+```bash
+nohup bash scripts/run_evasion_one_click.sh > logs/one_click_evasion.log 2>&1 &
+tail -f logs/one_click_evasion.log
+```
+
+With a specific detector proxy:
+
+```bash
+DETECTOR_MODEL_DIR=models/cv_xlmr/fold_01 \
+nohup bash scripts/run_evasion_one_click.sh > logs/one_click_evasion.log 2>&1 &
+```
+
+The expected Evasion output is:
+
+```text
+outputs/evasion/submissions/textgenadvtrack_evasion_val.csv
+```
 
 Use `data/training/adversarial_official_train.csv` as machine rewritten data and evaluate slices by `text_type`.
 The weak slice to watch is usually:

@@ -69,6 +69,30 @@ def test_cli_exposes_detection_and_evasion_commands():
     parser = build_parser()
     subcommands = parser._subparsers._group_actions[0].choices.keys()
     assert "validate-detection" in subcommands
+    assert "validate-detection-submit" in subcommands
+    assert "build-kfold-detection-splits" in subcommands
     assert "train-detector" in subcommands
     assert "select-evasion" in subcommands
+    assert "validate-evasion-submit" in subcommands
     assert "ingest-external-detection-dataset" in subcommands
+
+
+def test_cli_train_detector_accepts_local_model_name_without_choice_rejection():
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "train-detector",
+            "--backend",
+            "classic_plus",
+            "--model-name",
+            "pretrained/xlm-roberta-base",
+            "--train-csv",
+            "tests/fixtures/detection_rows.csv",
+            "--dev-csv",
+            "tests/fixtures/detection_rows.csv",
+            "--output-dir",
+            "tmp/model",
+        ]
+    )
+
+    assert args.model_name == "pretrained/xlm-roberta-base"

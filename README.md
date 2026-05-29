@@ -46,6 +46,32 @@ TEXTGENADVTRACK_DEFAULT_MODEL=your-model-id
   --split train
 ```
 
+服务器一键训练、导出、校验 Detection 提交：
+
+```bash
+nohup bash scripts/run_detection_one_click.sh > logs/one_click_xlmr.log 2>&1 &
+tail -f logs/one_click_xlmr.log
+```
+
+常用覆盖项：
+
+```bash
+MODEL_NAME=pretrained/xlm-roberta-base BATCH_SIZE=8 GRAD_ACCUM=2 \
+nohup bash scripts/run_detection_one_click.sh > logs/one_click_xlmr.log 2>&1 &
+```
+
+脚本默认产出并校验：
+
+- `outputs/detection/scores/xlmr_dev_scores.csv`
+- `outputs/detection/submissions/textgenadvtrack_test1_xlmr.xlsx`
+
+可选重复划分/多模型平均：
+
+```bash
+MODE=cv CV_FOLDS=10 \
+nohup bash scripts/run_detection_one_click.sh > logs/one_click_xlmr_cv.log 2>&1 &
+```
+
 ```bash
 .venv/bin/python -m textgenadvtrack.cli train-detector \
   --backend classic_plus \
@@ -68,6 +94,31 @@ TEXTGENADVTRACK_DEFAULT_MODEL=your-model-id
 - 标准训练集：`data/detection/train.csv`
 
 ## Evasion
+
+服务器一键生成、选择、导出、校验 Evasion 提交：
+
+```bash
+nohup bash scripts/run_evasion_one_click.sh > logs/one_click_evasion.log 2>&1 &
+tail -f logs/one_click_evasion.log
+```
+
+如果 Detection 模型已经训练好，脚本会优先用它给 Evasion 候选打 proxy 分：
+
+- `models/detector_xlmr_local`
+- `models/cv_xlmr/fold_01`
+
+也可以手动指定：
+
+```bash
+DETECTOR_MODEL_DIR=models/cv_xlmr/fold_01 \
+nohup bash scripts/run_evasion_one_click.sh > logs/one_click_evasion.log 2>&1 &
+```
+
+默认产出：
+
+- `outputs/evasion/candidates/official_val_candidates.csv`
+- `outputs/evasion/selected/official_val_selected.csv`
+- `outputs/evasion/submissions/textgenadvtrack_evasion_val.csv`
 
 ```bash
 .venv/bin/python -m textgenadvtrack.cli generate-evasion \

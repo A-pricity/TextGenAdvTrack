@@ -287,8 +287,10 @@ def train_detector(
 ) -> dict:
     if backend not in supported_training_backends():
         raise ValueError(f"Unsupported backend: {backend}")
-    if model_name not in supported_backbones():
-        raise ValueError(f"Unsupported model name: {model_name}")
+    if model_name not in supported_backbones() and not Path(model_name).exists():
+        raise ValueError(
+            f"Unsupported model name: {model_name}. Use one of {supported_backbones()} or a local model directory."
+        )
 
     started = time.time()
     if backend in {"classic", "classic_plus"}:

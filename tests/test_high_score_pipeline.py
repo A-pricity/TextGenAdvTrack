@@ -6,8 +6,13 @@ from textgenadvtrack.data.augment import build_adversarial_training_rows
 from textgenadvtrack.detection.calibration import tune_scores
 from textgenadvtrack.detection.ensemble import blend_prediction_files, search_blend_weights
 from textgenadvtrack.detection.predict import export_detection_scores
+from textgenadvtrack.detection.submission_validation import validate_detection_submission
 from textgenadvtrack.detection.train import train_detector
-from textgenadvtrack.detection.validation import build_repeated_detection_splits, evaluate_prediction_slices
+from textgenadvtrack.detection.validation import (
+    build_kfold_detection_splits,
+    build_repeated_detection_splits,
+    evaluate_prediction_slices,
+)
 
 
 def test_build_repeated_detection_splits_writes_seeded_splits(tmp_path):
@@ -29,6 +34,31 @@ def test_build_repeated_detection_splits_writes_seeded_splits(tmp_path):
     assert result["folds"] == 2
     assert (tmp_path / "splits" / "seed_1" / "official_train.csv").exists()
     assert (tmp_path / "splits" / "seed_2" / "official_dev.csv").exists()
+
+
+def test_build_kfold_detection_splits_writes_stratified_folds(tmp_path):
+    source = tmp_path / "val.csv"
+    source.write_text(
+        "prompt,text,label\n"
+        "p1,human one,1\n"
+        "p2,machine one,0\n"
+        "p3,human two,1\n"
+        "p4,machine two,0\n"
+        "p5,human three,1\n"
+        "p6,machine three,0\n"
+        "p7,human four,1\n"
+        "p8,machine four,0\n"
+    )
+
+    result = build_kfold_detection_splits(source, tmp_path / "kfold", folds=4, seed=7)
+
+    assert result["folds"] == 4
+    for fold in range(1, 5):
+        dev = pd.read_csv(tmp_path / "kfold" / f"fold_{fold:02d}" / "official_dev.csv")
+        train = pd.read_csv(tmp_path / "kfold" / f"fold_{fold:02d}" / "official_train.csv")
+        assert len(dev) == 2
+        assert len(train) == 6
+        assert set(dev["label"]) == {0, 1}
 
 
 def test_evaluate_prediction_slices_reports_overall_and_groups(tmp_path):
@@ -114,3 +144,37 @@ def test_export_detection_scores_writes_labels_and_predictions(tmp_path):
     frame = pd.read_csv(output_csv)
     assert result["rows"] == 4
     assert {"sample_id", "label", "text_prediction"}.issubset(frame.columns)
+
+
+def test_validate_detection_submission_checks_shape_and_scores(tmp_path):
+    input_csv = tmp_path / "input.csv"
+    submission = tmp_path / "submission.xlsx"
+    input_csv.write_text("prompt,text\np1,text one\np2,text two\n")
+    pd.DataFrame({"prompt": ["p1", "p2"], "text_prediction": [0.9, 0.1]}).to_excel(
+        submission,
+        sheet_name="predictions",
+        index=False,
+    )
+    with pd.ExcelWriter(submission, engine="openpyxl", mode="a") as writer:
+        pd.DataFrame([{"Data Volume": 2, "Time": 0.1}]).to_excel(writer, sheet_name="time", index=False)
+
+    result = validate_detection_submission(input_csv, submission, min_unique_scores=2)
+
+    assert result["status"] == "ok"
+    assert result["rows"] == 2
+    assert result["score_min"] == 0.1
+
+
+def test_train_detector_accepts_local_model_directory_for_classic_backend(tmp_path):
+    local_backbone = tmp_path / "local-backbone"
+    local_backbone.mkdir()
+
+    result = train_detector(
+        Path("tests/fixtures/detection_rows.csv"),
+        Path("tests/fixtures/detection_rows.csv"),
+        str(local_backbone),
+        tmp_path / "model",
+        backend="classic_plus",
+    )
+
+    assert result["status"] == "trained"

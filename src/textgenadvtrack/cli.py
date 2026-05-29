@@ -17,13 +17,19 @@ from textgenadvtrack.data.rewrite_ai import generate_ai_rewritten_data
 from textgenadvtrack.detection.data_prep import summarize_detection_split
 from textgenadvtrack.detection.calibration import tune_scores, tune_submission_scores
 from textgenadvtrack.detection.ensemble import blend_prediction_files, search_blend_weights
-from textgenadvtrack.detection.validation import build_repeated_detection_splits, evaluate_prediction_slices
+from textgenadvtrack.detection.validation import (
+    build_kfold_detection_splits,
+    build_repeated_detection_splits,
+    evaluate_prediction_slices,
+)
 from textgenadvtrack.detection.predict import export_detection_scores, export_detection_submission
+from textgenadvtrack.detection.submission_validation import validate_detection_submission
 from textgenadvtrack.detection.train import train_detector
 from textgenadvtrack.detection.train import supported_backbones, supported_training_backends
 from textgenadvtrack.evasion.export import build_evasion_submission
 from textgenadvtrack.evasion.generate_candidates import generate_candidates
 from textgenadvtrack.evasion.select_candidates import score_and_select_candidates
+from textgenadvtrack.evasion.validation import validate_evasion_submission
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -105,6 +111,12 @@ def build_parser() -> argparse.ArgumentParser:
     repeated_split_parser.add_argument("--seeds", type=int, nargs="+", required=True)
     repeated_split_parser.add_argument("--dev-fraction", type=float, default=0.2)
     repeated_split_parser.add_argument("--language", choices=["zh", "en", "ru"], default="zh")
+    kfold_split_parser = subparsers.add_parser("build-kfold-detection-splits")
+    kfold_split_parser.add_argument("--val-with-label-csv", type=Path, required=True)
+    kfold_split_parser.add_argument("--output-dir", type=Path, required=True)
+    kfold_split_parser.add_argument("--folds", type=int, default=10)
+    kfold_split_parser.add_argument("--seed", type=int, default=42)
+    kfold_split_parser.add_argument("--language", choices=["zh", "en", "ru"], default="zh")
     complete_parser = subparsers.add_parser("build-completed-detection-dataset")
     complete_parser.add_argument("--official-val-with-label-csv", type=Path, required=True)
     complete_parser.add_argument("--output-dir", type=Path, required=True)
@@ -123,7 +135,11 @@ def build_parser() -> argparse.ArgumentParser:
     validate_parser = subparsers.add_parser("validate-detection")
     validate_parser.add_argument("--csv-path", type=Path, required=True)
     train_parser = subparsers.add_parser("train-detector")
-    train_parser.add_argument("--model-name", choices=supported_backbones(), required=True)
+    train_parser.add_argument(
+        "--model-name",
+        required=True,
+        help=f"Known backbone name ({', '.join(supported_backbones())}) or a local model directory.",
+    )
     train_parser.add_argument("--backend", choices=supported_training_backends(), default="classic")
     train_parser.add_argument("--train-csv", type=Path, required=True)
     train_parser.add_argument("--dev-csv", type=Path, required=True)
@@ -145,6 +161,10 @@ def build_parser() -> argparse.ArgumentParser:
     score_parser.add_argument("--input-csv", type=Path, required=True)
     score_parser.add_argument("--model-dir", type=Path, required=True)
     score_parser.add_argument("--output-csv", type=Path, required=True)
+    submit_validate_parser = subparsers.add_parser("validate-detection-submit")
+    submit_validate_parser.add_argument("--input-csv", type=Path, required=True)
+    submit_validate_parser.add_argument("--submission-xlsx", type=Path, required=True)
+    submit_validate_parser.add_argument("--min-unique-scores", type=int, default=10)
     slice_eval_parser = subparsers.add_parser("evaluate-detection-slices")
     slice_eval_parser.add_argument("--labels-csv", type=Path, required=True)
     slice_eval_parser.add_argument("--predictions", type=Path, required=True)
@@ -179,6 +199,9 @@ def build_parser() -> argparse.ArgumentParser:
     submit_parser.add_argument("--official-input-csv", type=Path, required=True)
     submit_parser.add_argument("--selected-csv", type=Path, required=True)
     submit_parser.add_argument("--output-csv", type=Path, required=True)
+    evasion_validate_parser = subparsers.add_parser("validate-evasion-submit")
+    evasion_validate_parser.add_argument("--official-input-csv", type=Path, required=True)
+    evasion_validate_parser.add_argument("--submission-csv", type=Path, required=True)
     return parser
 
 
@@ -309,6 +332,16 @@ def main() -> None:
                 language=args.language,
             )
         )
+    elif args.command == "build-kfold-detection-splits":
+        print(
+            build_kfold_detection_splits(
+                args.val_with_label_csv,
+                args.output_dir,
+                folds=args.folds,
+                seed=args.seed,
+                language=args.language,
+            )
+        )
     elif args.command == "build-completed-detection-dataset":
         print(
             build_completed_detection_dataset(
@@ -348,6 +381,8 @@ def main() -> None:
         print(export_detection_submission(args.input_csv, args.model_dir, args.output_xlsx))
     elif args.command == "score-detection-csv":
         print(export_detection_scores(args.input_csv, args.model_dir, args.output_csv))
+    elif args.command == "validate-detection-submit":
+        print(validate_detection_submission(args.input_csv, args.submission_xlsx, args.min_unique_scores))
     elif args.command == "evaluate-detection-slices":
         print(evaluate_prediction_slices(args.labels_csv, args.predictions, args.group_columns))
     elif args.command == "search-detection-blend":
@@ -372,6 +407,8 @@ def main() -> None:
         print({"selected_rows": len(rows), "output_csv": str(args.output_csv)})
     elif args.command == "build-evasion-submit":
         print(build_evasion_submission(args.official_input_csv, args.selected_csv, args.output_csv))
+    elif args.command == "validate-evasion-submit":
+        print(validate_evasion_submission(args.official_input_csv, args.submission_csv))
 
 
 if __name__ == "__main__":

@@ -32,6 +32,11 @@ require_file() {
   fi
 }
 
+if [[ ! -f "$SOURCE_CSV" && -f data/evasion/official/val_machine_only.csv ]]; then
+  SOURCE_CSV="data/evasion/official/val_machine_only.csv"
+  printf '[info] using official evasion source: %s\n' "$SOURCE_CSV"
+fi
+
 require_file "$SOURCE_CSV"
 require_file "$OFFICIAL_INPUT_CSV"
 

@@ -16,6 +16,7 @@ MODEL_DIR="${MODEL_DIR:-models/detector_xlmr_local}"
 TRAIN_CSV="${TRAIN_CSV:-data/detection/train.csv}"
 DEV_CSV="${DEV_CSV:-data/detection/val.csv}"
 OFFICIAL_INPUT_CSV="${OFFICIAL_INPUT_CSV:-data/detection/official/test1_input.csv}"
+OFFICIAL_VAL_WITH_LABEL_CSV="${OFFICIAL_VAL_WITH_LABEL_CSV:-data/detection/official/val_with_label.csv}"
 OUTPUT_XLSX="${OUTPUT_XLSX:-outputs/detection/submissions/textgenadvtrack_test1_xlmr.xlsx}"
 DEV_SCORE_CSV="${DEV_SCORE_CSV:-outputs/detection/scores/xlmr_dev_scores.csv}"
 RUN_TRAIN="${RUN_TRAIN:-1}"
@@ -48,8 +49,6 @@ require_file() {
   fi
 }
 
-require_file "$TRAIN_CSV"
-require_file "$DEV_CSV"
 require_file "$OFFICIAL_INPUT_CSV"
 
 train_model() {
@@ -89,6 +88,8 @@ export_and_validate() {
 }
 
 if [[ "$MODE" == "single" ]]; then
+  require_file "$TRAIN_CSV"
+  require_file "$DEV_CSV"
   train_model "$TRAIN_CSV" "$DEV_CSV" "$MODEL_DIR"
   if [[ "$RUN_DEV_SCORE" == "1" ]]; then
     run_cmd "$PYTHON_BIN" -m textgenadvtrack.cli score-detection-csv \
@@ -99,8 +100,9 @@ if [[ "$MODE" == "single" ]]; then
   export_and_validate "$MODEL_DIR" "$OUTPUT_XLSX"
   printf '\n[done] submission: %s\n' "$OUTPUT_XLSX"
 elif [[ "$MODE" == "cv" ]]; then
+  require_file "$OFFICIAL_VAL_WITH_LABEL_CSV"
   run_cmd "$PYTHON_BIN" -m textgenadvtrack.cli build-kfold-detection-splits \
-    --val-with-label-csv data/detection/official/val_with_label.csv \
+    --val-with-label-csv "$OFFICIAL_VAL_WITH_LABEL_CSV" \
     --output-dir "$CV_OUTPUT_DIR" \
     --folds "$CV_FOLDS" \
     --seed "$CV_SEED" \

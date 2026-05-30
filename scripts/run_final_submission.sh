@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ====================================================
-# 最终提交一键脚本
+# Detection 基础版一键脚本
 # 策略: classic_plus + XLM-R 10-fold ensemble 融合
 # ====================================================
 set -euo pipefail
@@ -10,60 +10,79 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_DIR"
 
 # --- 配置 ---
-VAL_CSV="data/detection/official/val_with_label.csv"
+VAL_LABEL_CSV="data/detection/official/val_with_label.csv"
 TEST1_CSV="data/detection/official/test1_input.csv"
+PREPARED_DIR="/tmp/textgenadvtrack_completed_detection"
 CLASSIC_MODEL="models/classic_plus_full"
 XLMR_MODEL="models/cv_xlmr/fold_01"
 OUT_DIR="outputs/detection"
 SUB_DIR="$OUT_DIR/submissions"
 SCORE_DIR="$OUT_DIR/scores"
-
 mkdir -p "$SCORE_DIR" "$SUB_DIR"
 
-# --- Step 1: 训练 classic_plus ---
+# ====================================================
+# Step 1: 准备训练数据
+# ====================================================
 echo ""
 echo "===================================================="
-echo "  Step 1/6: 训练 classic_plus 模型"
+echo "  Step 1/6: 准备训练数据"
+echo "===================================================="
+.venv/bin/python -m textgenadvtrack.cli build-completed-detection-dataset \
+  --official-val-with-label-csv "$VAL_LABEL_CSV" \
+  --output-dir "$PREPARED_DIR" \
+  --dev-fraction 0.2 \
+  --seed 42
+
+TRAIN_CSV="$PREPARED_DIR/completed_train.csv"
+DEV_CSV="$PREPARED_DIR/completed_dev.csv"
+
+# ====================================================
+# Step 2: 训练 classic_plus
+# ====================================================
+echo ""
+echo "===================================================="
+echo "  Step 2/6: 训练 classic_plus 模型"
 echo "===================================================="
 .venv/bin/python -m textgenadvtrack.cli train-detector \
   --backend classic_plus \
   --model-name xlm-roberta-base \
-  --train-csv "$VAL_CSV" \
-  --dev-csv "$VAL_CSV" \
+  --train-csv "$TRAIN_CSV" \
+  --dev-csv "$DEV_CSV" \
   --output-dir "$CLASSIC_MODEL"
 
-# --- Step 2: classic_plus 对 val 打分 ---
+# ====================================================
+# Step 3: 对 val 打分
+# ====================================================
 echo ""
 echo "===================================================="
-echo "  Step 2/6: classic_plus 对 val 打分"
+echo "  Step 3/6: 对 val 打分"
 echo "===================================================="
 .venv/bin/python -m textgenadvtrack.cli score-detection-csv \
-  --input-csv "$VAL_CSV" \
+  --input-csv "$DEV_CSV" \
   --model-dir "$CLASSIC_MODEL" \
   --output-csv "$SCORE_DIR/classic_plus_val.csv"
 
-# --- Step 3: XLM-R 对 val 打分 ---
-echo ""
-echo "===================================================="
-echo "  Step 3/6: XLM-R fold_01 对 val 打分"
-echo "===================================================="
 .venv/bin/python -m textgenadvtrack.cli score-detection-csv \
-  --input-csv "$VAL_CSV" \
+  --input-csv "$DEV_CSV" \
   --model-dir "$XLMR_MODEL" \
   --output-csv "$SCORE_DIR/xlmr_val.csv"
 
-# --- Step 4: 搜索最优融合权重 ---
+# ====================================================
+# Step 4: 搜索最优融合权重
+# ====================================================
 echo ""
 echo "===================================================="
 echo "  Step 4/6: 搜索最优融合权重"
 echo "===================================================="
 .venv/bin/python -m textgenadvtrack.cli search-detection-blend \
-  --labels-csv "$VAL_CSV" \
+  --labels-csv "$DEV_CSV" \
   --prediction "$SCORE_DIR/classic_plus_val.csv" \
   --prediction "$SCORE_DIR/xlmr_val.csv" \
   --step 0.05
 
-# --- Step 5: 生成 classic_plus test1 submission ---
+# ====================================================
+# Step 5: 生成 test1 submission + 融合
+# ====================================================
 echo ""
 echo "===================================================="
 echo "  Step 5/6: 生成 classic_plus test1 submission"
@@ -73,15 +92,12 @@ echo "===================================================="
   --model-dir "$CLASSIC_MODEL" \
   --output-xlsx "$SUB_DIR/textgenadvtrack_test1_classic_plus.xlsx"
 
-# --- Step 6: 融合两个 submission ---
 echo ""
 echo "===================================================="
-echo "  Step 6/6: 融合 submission (等权 0.5/0.5)"
+echo "  Step 5/6: 融合 submission"
 echo "===================================================="
-echo "NOTE: 请根据 Step 4 的搜索结果调整下面的权重!"
-echo "      当前使用默认 0.5/0.5，最优权重可能不同。"
+echo "NOTE: 请根据 Step 4 的搜索结果调整权重!"
 
-# 默认等权融合，根据 Step 4 结果手动调整
 W_CLASSIC="${W_CLASSIC:-0.5}"
 W_XLMR="${W_XLMR:-0.5}"
 
@@ -94,10 +110,12 @@ FINAL_XLSX="$SUB_DIR/textgenadvtrack_test1_final_blend.xlsx"
   --weight "$W_XLMR" \
   --output-xlsx "$FINAL_XLSX"
 
-# --- 验证 ---
+# ====================================================
+# Step 6: 验证
+# ====================================================
 echo ""
 echo "===================================================="
-echo "  验证最终 submission"
+echo "  Step 6/6: 验证最终 submission"
 echo "===================================================="
 .venv/bin/python -m textgenadvtrack.cli validate-detection-submit \
   --input-csv "$TEST1_CSV" \
@@ -109,7 +127,6 @@ echo "  DONE"
 echo "===================================================="
 echo "  最终 submission: $FINAL_XLSX"
 echo ""
-echo "  如果 Step 4 搜索出的最优权重不是 0.5/0.5,"
-echo "  重新运行:"
-echo "    W_CLASSIC=<最优权重> W_XLMR=<1-最优权重> bash scripts/run_final_submission.sh"
+echo "  如需调整权重:"
+echo "    W_CLASSIC=0.6 W_XLMR=0.4 bash scripts/run_final_submission.sh"
 echo "===================================================="

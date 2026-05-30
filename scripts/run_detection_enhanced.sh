@@ -24,6 +24,7 @@ CLASSIC_MODEL="models/classic_plus_full"
 XLMR3_MODEL="models/cv_xlmr/fold_01"           # 已有的 3-epoch 模型
 XLMR8_MODEL="models/xlmr_full_8ep"
 DEBERTA_MODEL="models/deberta_full"
+DEBERTA_LOCAL="pretrained/deberta-v3-base"
 
 # ====================================================
 # Step 1: 准备训练数据 (把 val_with_label 转成完整 schema)
@@ -80,6 +81,19 @@ echo "===================================================="
   --weight-decay 0.01
 
 # ====================================================
+# Step 3.5: 下载 DeBERTa-v3-base (ModelScope)
+# ====================================================
+echo ""
+echo "===================================================="
+echo "  Step 3.5/8: 下载 DeBERTa-v3-base (ModelScope)"
+echo "===================================================="
+if [ ! -d "$DEBERTA_LOCAL" ]; then
+  pip install modelscope -q
+  modelscope download --model iic/nlp_debertav3-base_chinese --local_dir "$DEBERTA_LOCAL"
+fi
+echo "  DeBERTa 模型路径: $DEBERTA_LOCAL"
+
+# ====================================================
 # Step 4: 训练 DeBERTa-v3-base
 # ====================================================
 echo ""
@@ -88,7 +102,7 @@ echo "  Step 4/8: 训练 DeBERTa-v3-base"
 echo "===================================================="
 .venv/bin/python -m textgenadvtrack.cli train-detector \
   --backend transformer \
-  --model-name microsoft/deberta-v3-base \
+  --model-name "$DEBERTA_LOCAL" \
   --train-csv "$TRAIN_CSV" \
   --dev-csv "$DEV_CSV" \
   --output-dir "$DEBERTA_MODEL" \

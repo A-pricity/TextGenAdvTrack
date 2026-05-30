@@ -26,9 +26,8 @@ import requests
 # LLM API call (OpenAI-compatible)
 # ============================================================
 
-def call_llm(text: str, base_url: str, model: str, api_key: str, timeout: int = 120) -> str:
-    """Call LLM API to rewrite a single text."""
-    # Detect language for prompt
+def call_llm(text: str, base_url: str, model: str, api_key: str, timeout: int = 120, max_retries: int = 5) -> str:
+    """Call LLM API to rewrite a single text, with retry on failure."""
     import re
     if re.search(r'[\u0400-\u04FF]', text):
         lang_hint = "Russian"
@@ -50,26 +49,34 @@ def call_llm(text: str, base_url: str, model: str, api_key: str, timeout: int = 
         "- Keep roughly similar length to the original"
     )
 
-    response = requests.post(
-        f"{base_url}/chat/completions",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Rewrite this text:\n\n{text}"},
-            ],
-            "temperature": 0.9,
-            "max_tokens": 4096,
-        },
-        timeout=timeout,
-    )
-    response.raise_for_status()
-    data = response.json()
-    return data["choices"][0]["message"]["content"].strip()
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(
+                f"{base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": f"Rewrite this text:\n\n{text}"},
+                    ],
+                    "temperature": 0.9,
+                    "max_tokens": 4096,
+                },
+                timeout=timeout,
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data["choices"][0]["message"]["content"].strip()
+        except Exception as e:
+            last_error = e
+            wait = min(2 ** attempt, 30)  # exponential backoff, max 30s
+            time.sleep(wait)
+    raise last_error
 
 
 # ============================================================

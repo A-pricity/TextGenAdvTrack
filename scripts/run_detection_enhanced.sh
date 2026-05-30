@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ====================================================
-# Detection 增强版脚本
+# Detection 增强版脚本 (支持断点续跑)
 # 策略: classic_plus + XLM-R + XLM-R-8ep + DeBERTa 四方融合
 # 预计耗时: ~90 分钟 (4090)
 # ====================================================
@@ -21,125 +21,150 @@ mkdir -p "$SCORE_DIR" "$SUB_DIR"
 
 # 模型目录
 CLASSIC_MODEL="models/classic_plus_full"
-XLMR3_MODEL="models/cv_xlmr/fold_01"           # 已有的 3-epoch 模型
+XLMR3_MODEL="models/cv_xlmr/fold_01"
 XLMR8_MODEL="models/xlmr_full_8ep"
 DEBERTA_MODEL="models/deberta_full"
 DEBERTA_LOCAL="pretrained/deberta-v3-base"
 
+# --- 断点续跑辅助函数 ---
+skip_if_done() {
+  local marker="$1"
+  local desc="$2"
+  if [ -f "$marker" ]; then
+    echo ""
+    echo "  [SKIP] $desc (已完成: $marker)"
+    return 0
+  fi
+  return 1
+}
+
 # ====================================================
-# Step 1: 准备训练数据 (把 val_with_label 转成完整 schema)
+# Step 1: 准备训练数据
 # ====================================================
-echo ""
-echo "===================================================="
-echo "  Step 1/8: 准备训练数据"
-echo "===================================================="
-.venv/bin/python -m textgenadvtrack.cli build-completed-detection-dataset \
-  --official-val-with-label-csv "$VAL_LABEL_CSV" \
-  --output-dir "$PREPARED_DIR" \
-  --dev-fraction 0.2 \
-  --seed 42 \
-  --language en
+if skip_if_done "$PREPARED_DIR/completed_train.csv" "Step 1/8: 准备训练数据"; then
+  true
+else
+  echo ""
+  echo "===================================================="
+  echo "  Step 1/8: 准备训练数据"
+  echo "===================================================="
+  .venv/bin/python -m textgenadvtrack.cli build-completed-detection-dataset \
+    --official-val-with-label-csv "$VAL_LABEL_CSV" \
+    --output-dir "$PREPARED_DIR" \
+    --dev-fraction 0.2 \
+    --seed 42 \
+    --language en
+fi
 
 TRAIN_CSV="$PREPARED_DIR/completed_train.csv"
 DEV_CSV="$PREPARED_DIR/completed_dev.csv"
 
-echo "  Train: $TRAIN_CSV"
-echo "  Dev:   $DEV_CSV"
-
 # ====================================================
 # Step 2: 训练 classic_plus
 # ====================================================
-echo ""
-echo "===================================================="
-echo "  Step 2/8: 训练 classic_plus"
-echo "===================================================="
-.venv/bin/python -m textgenadvtrack.cli train-detector \
-  --backend classic_plus \
-  --model-name xlm-roberta-base \
-  --train-csv "$TRAIN_CSV" \
-  --dev-csv "$DEV_CSV" \
-  --output-dir "$CLASSIC_MODEL"
+if skip_if_done "$CLASSIC_MODEL/model.joblib" "Step 2/8: 训练 classic_plus"; then
+  true
+else
+  echo ""
+  echo "===================================================="
+  echo "  Step 2/8: 训练 classic_plus"
+  echo "===================================================="
+  .venv/bin/python -m textgenadvtrack.cli train-detector \
+    --backend classic_plus \
+    --model-name xlm-roberta-base \
+    --train-csv "$TRAIN_CSV" \
+    --dev-csv "$DEV_CSV" \
+    --output-dir "$CLASSIC_MODEL"
+fi
 
 # ====================================================
 # Step 3: 训练 XLM-R 8-epoch
 # ====================================================
-echo ""
-echo "===================================================="
-echo "  Step 3/8: 训练 XLM-R (8 epochs)"
-echo "===================================================="
-.venv/bin/python -m textgenadvtrack.cli train-detector \
-  --backend transformer \
-  --model-name ./xlm-roberta-base \
-  --train-csv "$TRAIN_CSV" \
-  --dev-csv "$DEV_CSV" \
-  --output-dir "$XLMR8_MODEL" \
-  --epochs 8 \
-  --batch-size 8 \
-  --gradient-accumulation-steps 2 \
-  --learning-rate 1e-5 \
-  --max-length 512 \
-  --weight-decay 0.01
+if skip_if_done "$XLMR8_MODEL/transformer_model/model.safetensors" "Step 3/8: 训练 XLM-R (8 epochs)"; then
+  true
+else
+  echo ""
+  echo "===================================================="
+  echo "  Step 3/8: 训练 XLM-R (8 epochs)"
+  echo "===================================================="
+  .venv/bin/python -m textgenadvtrack.cli train-detector \
+    --backend transformer \
+    --model-name ./xlm-roberta-base \
+    --train-csv "$TRAIN_CSV" \
+    --dev-csv "$DEV_CSV" \
+    --output-dir "$XLMR8_MODEL" \
+    --epochs 8 \
+    --batch-size 8 \
+    --gradient-accumulation-steps 2 \
+    --learning-rate 1e-5 \
+    --max-length 512 \
+    --weight-decay 0.01
+fi
 
 # ====================================================
 # Step 3.5: 下载 DeBERTa-v3-base (ModelScope)
 # ====================================================
-echo ""
-echo "===================================================="
-echo "  Step 3.5/8: 下载 DeBERTa-v3-base (ModelScope)"
-echo "===================================================="
-if [ ! -d "$DEBERTA_LOCAL" ]; then
+if skip_if_done "$DEBERTA_LOCAL/config.json" "Step 3.5/8: 下载 DeBERTa"; then
+  true
+else
+  echo ""
+  echo "===================================================="
+  echo "  Step 3.5/8: 下载 DeBERTa-v3-base (ModelScope)"
+  echo "===================================================="
   pip install modelscope -q
   modelscope download --model iic/nlp_debertav3-base_chinese --local_dir "$DEBERTA_LOCAL"
+  echo "  DeBERTa 模型路径: $DEBERTA_LOCAL"
 fi
-echo "  DeBERTa 模型路径: $DEBERTA_LOCAL"
 
 # ====================================================
 # Step 4: 训练 DeBERTa-v3-base
 # ====================================================
-echo ""
-echo "===================================================="
-echo "  Step 4/8: 训练 DeBERTa-v3-base"
-echo "===================================================="
-.venv/bin/python -m textgenadvtrack.cli train-detector \
-  --backend transformer \
-  --model-name "$DEBERTA_LOCAL" \
-  --train-csv "$TRAIN_CSV" \
-  --dev-csv "$DEV_CSV" \
-  --output-dir "$DEBERTA_MODEL" \
-  --epochs 5 \
-  --batch-size 4 \
-  --gradient-accumulation-steps 4 \
-  --learning-rate 1e-5 \
-  --max-length 512 \
-  --weight-decay 0.01
+if skip_if_done "$DEBERTA_MODEL/transformer_model/model.safetensors" "Step 4/8: 训练 DeBERTa-v3-base"; then
+  true
+else
+  echo ""
+  echo "===================================================="
+  echo "  Step 4/8: 训练 DeBERTa-v3-base"
+  echo "===================================================="
+  .venv/bin/python -m textgenadvtrack.cli train-detector \
+    --backend transformer \
+    --model-name "$DEBERTA_LOCAL" \
+    --train-csv "$TRAIN_CSV" \
+    --dev-csv "$DEV_CSV" \
+    --output-dir "$DEBERTA_MODEL" \
+    --epochs 5 \
+    --batch-size 4 \
+    --gradient-accumulation-steps 4 \
+    --learning-rate 1e-5 \
+    --max-length 512 \
+    --weight-decay 0.01
+fi
 
 # ====================================================
-# Step 5: 四个模型对 val 打分 (用完整 schema 的 val)
+# Step 5: 四个模型对 val 打分
 # ====================================================
 echo ""
 echo "===================================================="
 echo "  Step 5/8: 四个模型对 val 打分"
 echo "===================================================="
 
-.venv/bin/python -m textgenadvtrack.cli score-detection-csv \
-  --input-csv "$DEV_CSV" \
-  --model-dir "$CLASSIC_MODEL" \
-  --output-csv "$SCORE_DIR/classic_plus_val.csv"
-
-.venv/bin/python -m textgenadvtrack.cli score-detection-csv \
-  --input-csv "$DEV_CSV" \
-  --model-dir "$XLMR3_MODEL" \
-  --output-csv "$SCORE_DIR/xlmr3_val.csv"
-
-.venv/bin/python -m textgenadvtrack.cli score-detection-csv \
-  --input-csv "$DEV_CSV" \
-  --model-dir "$XLMR8_MODEL" \
-  --output-csv "$SCORE_DIR/xlmr8_val.csv"
-
-.venv/bin/python -m textgenadvtrack.cli score-detection-csv \
-  --input-csv "$DEV_CSV" \
-  --model-dir "$DEBERTA_MODEL" \
-  --output-csv "$SCORE_DIR/deberta_val.csv"
+for pair in \
+  "$CLASSIC_MODEL|$SCORE_DIR/classic_plus_val.csv|classic_plus" \
+  "$XLMR3_MODEL|$SCORE_DIR/xlmr3_val.csv|xlmr3" \
+  "$XLMR8_MODEL|$SCORE_DIR/xlmr8_val.csv|xlmr8" \
+  "$DEBERTA_MODEL|$SCORE_DIR/deberta_val.csv|deberta"
+do
+  IFS='|' read -r MODEL_DIR SCORE_FILE NAME <<< "$pair"
+  if [ -f "$SCORE_FILE" ]; then
+    echo "  [SKIP] 打分 $NAME (已完成)"
+  else
+    echo "  打分 $NAME ..."
+    .venv/bin/python -m textgenadvtrack.cli score-detection-csv \
+      --input-csv "$DEV_CSV" \
+      --model-dir "$MODEL_DIR" \
+      --output-csv "$SCORE_FILE"
+  fi
+done
 
 # ====================================================
 # Step 6: 搜索最优融合权重
@@ -164,22 +189,22 @@ echo "===================================================="
 echo "  Step 7/8: 生成 test1 submission (4个模型)"
 echo "===================================================="
 
-.venv/bin/python -m textgenadvtrack.cli export-detection-submit \
-  --input-csv "$TEST1_CSV" \
-  --model-dir "$CLASSIC_MODEL" \
-  --output-xlsx "$SUB_DIR/textgenadvtrack_test1_classic_plus.xlsx"
-
-# XLM-R 3-epoch 10-fold ensemble 已有
-
-.venv/bin/python -m textgenadvtrack.cli export-detection-submit \
-  --input-csv "$TEST1_CSV" \
-  --model-dir "$XLMR8_MODEL" \
-  --output-xlsx "$SUB_DIR/textgenadvtrack_test1_xlmr8ep.xlsx"
-
-.venv/bin/python -m textgenadvtrack.cli export-detection-submit \
-  --input-csv "$TEST1_CSV" \
-  --model-dir "$DEBERTA_MODEL" \
-  --output-xlsx "$SUB_DIR/textgenadvtrack_test1_deberta.xlsx"
+for pair in \
+  "$CLASSIC_MODEL|$SUB_DIR/textgenadvtrack_test1_classic_plus.xlsx|classic_plus" \
+  "$XLMR8_MODEL|$SUB_DIR/textgenadvtrack_test1_xlmr8ep.xlsx|xlmr8ep" \
+  "$DEBERTA_MODEL|$SUB_DIR/textgenadvtrack_test1_deberta.xlsx|deberta"
+do
+  IFS='|' read -r MODEL_DIR XLSX_FILE NAME <<< "$pair"
+  if [ -f "$XLSX_FILE" ]; then
+    echo "  [SKIP] 导出 $NAME (已完成)"
+  else
+    echo "  导出 $NAME ..."
+    .venv/bin/python -m textgenadvtrack.cli export-detection-submit \
+      --input-csv "$TEST1_CSV" \
+      --model-dir "$MODEL_DIR" \
+      --output-xlsx "$XLSX_FILE"
+  fi
+done
 
 echo ""
 echo "===================================================="

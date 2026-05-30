@@ -189,6 +189,10 @@ def main():
     failed = 0
     start_time = time.time()
 
+    print(f"[start] 开始调用 LLM API ...")
+    import sys
+    sys.stdout.flush()
+
     with ThreadPoolExecutor(max_workers=args.concurrency) as executor:
         futures = {}
         for source_row in remaining:
@@ -214,7 +218,7 @@ def main():
                 batch = []
 
             # Progress
-            if completed % 100 == 0 or completed == len(futures):
+            if completed % 10 == 0 or completed == len(futures):
                 elapsed = time.time() - start_time
                 rate = completed / elapsed if elapsed > 0 else 0
                 eta = (len(futures) - completed) / rate if rate > 0 else 0

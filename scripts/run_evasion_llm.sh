@@ -29,7 +29,7 @@ SELECTED_CSV="outputs/evasion/selected/llm_selected.csv"
 SUBMISSION_CSV="outputs/evasion/submissions/textgenadvtrack_evasion_val_llm.csv"
 
 CANDIDATES_PER_TEXT="${CANDIDATES_PER_TEXT:-3}"
-CONCURRENCY="${CONCURRENCY:-10}"
+CONCURRENCY="${CONCURRENCY:-3}"
 
 mkdir -p outputs/evasion/candidates outputs/evasion/selected outputs/evasion/submissions
 

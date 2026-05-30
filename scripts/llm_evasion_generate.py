@@ -12,7 +12,6 @@ Usage:
 """
 import argparse
 import csv
-import json
 import os
 import sys
 import time
@@ -190,7 +189,6 @@ def main():
     start_time = time.time()
 
     print(f"[start] 开始调用 LLM API ...")
-    import sys
     sys.stdout.flush()
 
     with ThreadPoolExecutor(max_workers=args.concurrency) as executor:

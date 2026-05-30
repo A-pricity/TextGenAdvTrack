@@ -52,10 +52,7 @@ python scripts/llm_evasion_generate.py \
   --source-csv "$SOURCE_CSV" \
   --output-csv "$CANDIDATES_CSV" \
   --candidates-per-text "$CANDIDATES_PER_TEXT" \
-  --concurrency "$CONCURRENCY" \
-  --base-url "$LLM_BASE_URL" \
-  --model "$LLM_MODEL" \
-  --api-key "$LLM_API_KEY"
+  --concurrency "$CONCURRENCY"
 
 # --- Step 2: 检测器打分 + 选择最优 ---
 echo ""

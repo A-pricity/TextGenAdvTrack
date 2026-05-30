@@ -36,7 +36,8 @@ echo "===================================================="
   --official-val-with-label-csv "$VAL_LABEL_CSV" \
   --output-dir "$PREPARED_DIR" \
   --dev-fraction 0.2 \
-  --seed 42
+  --seed 42 \
+  --language en
 
 TRAIN_CSV="$PREPARED_DIR/completed_train.csv"
 DEV_CSV="$PREPARED_DIR/completed_dev.csv"

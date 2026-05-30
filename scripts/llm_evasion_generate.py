@@ -150,12 +150,12 @@ def main():
     parser.add_argument("--api-key", default=None, help="LLM API key (or set LLM_API_KEY)")
     args = parser.parse_args()
 
-    base_url = args.base_url or os.getenv("LLM_BASE_URL")
-    model = args.model or os.getenv("LLM_MODEL")
-    api_key = args.api_key or os.getenv("LLM_API_KEY")
+    base_url = args.base_url or os.getenv("OPENAI_BASE_URL")
+    model = args.model or os.getenv("TEXTGENADVTRACK_DEFAULT_MODEL")
+    api_key = args.api_key or os.getenv("OPENAI_API_KEY")
 
     if not all([base_url, model, api_key]):
-        print("ERROR: Set LLM_BASE_URL, LLM_MODEL, LLM_API_KEY env vars or pass --base-url/--model/--api-key", file=sys.stderr)
+        print("ERROR: Set OPENAI_BASE_URL, TEXTGENADVTRACK_DEFAULT_MODEL, OPENAI_API_KEY in .env or pass --base-url/--model/--api-key", file=sys.stderr)
         sys.exit(1)
 
     # Load source rows

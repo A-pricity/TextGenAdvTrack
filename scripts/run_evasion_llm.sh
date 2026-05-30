@@ -9,10 +9,17 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_DIR"
 
-# --- 配置 (通过环境变量或默认值) ---
-LLM_BASE_URL="${LLM_BASE_URL:?ERROR: 请设置 LLM_BASE_URL 环境变量}"
-LLM_MODEL="${LLM_MODEL:?ERROR: 请设置 LLM_MODEL 环境变量}"
-LLM_API_KEY="${LLM_API_KEY:?ERROR: 请设置 LLM_API_KEY 环境变量}"
+# --- 加载 .env ---
+if [ -f .env ]; then
+  set -a
+  source .env
+  set +a
+fi
+
+# --- 配置 (从 .env 读取) ---
+LLM_BASE_URL="${OPENAI_BASE_URL:?ERROR: 请在 .env 中设置 OPENAI_BASE_URL}"
+LLM_MODEL="${TEXTGENADVTRACK_DEFAULT_MODEL:?ERROR: 请在 .env 中设置 TEXTGENADVTRACK_DEFAULT_MODEL}"
+LLM_API_KEY="${OPENAI_API_KEY:?ERROR: 请在 .env 中设置 OPENAI_API_KEY}"
 
 SOURCE_CSV="data/evasion/official/val_machine_only.csv"
 OFFICIAL_INPUT="data/detection/official/val_with_label.csv"

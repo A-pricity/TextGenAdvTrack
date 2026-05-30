@@ -160,6 +160,9 @@ def main():
     model = args.model or os.getenv("TEXTGENADVTRACK_DEFAULT_MODEL")
     api_key = args.api_key or os.getenv("OPENAI_API_KEY")
 
+    print(f"[debug] base_url={base_url}, model={model}, api_key={'***' if api_key else None}", file=sys.stderr)
+    print(f"[debug] env OPENAI_BASE_URL={os.getenv(chr(79)+chr(80)+chr(69)+chr(78)+chr(65)+chr(73)+chr(95)+chr(66)+chr(65)+chr(83)+chr(69)+chr(95)+chr(85)+chr(82)+chr(76))}", file=sys.stderr)
+
     if not all([base_url, model, api_key]):
         print("ERROR: Set OPENAI_BASE_URL, TEXTGENADVTRACK_DEFAULT_MODEL, OPENAI_API_KEY in .env or pass --base-url/--model/--api-key", file=sys.stderr)
         sys.exit(1)

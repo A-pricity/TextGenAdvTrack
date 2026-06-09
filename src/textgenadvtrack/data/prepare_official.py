@@ -12,6 +12,7 @@ def prepare_official_data(raw_dir: Path, output_root: Path) -> dict:
     val_path = raw_dir / "UCAS_AISAD_TEXT-val.csv"
     val_label_path = raw_dir / "UCAS_AISAD_TEXT-val_label.csv"
     test1_path = raw_dir / "UCAS_AISAD_TEXT-test1.csv"
+    test2_path = raw_dir / "UCAS_AISAD_TEXT-test2.csv"
 
     detection_official_dir = output_root / "detection" / "official"
     evasion_official_dir = output_root / "evasion" / "official"
@@ -32,6 +33,12 @@ def prepare_official_data(raw_dir: Path, output_root: Path) -> dict:
     val_submit_input_df = val_df[["prompt", "text"]].copy()
     val_label_only_df = val_with_label_df[["label"]].copy()
     test1_input_df = test1_df[["prompt", "text"]].copy()
+
+    # test2 is optional (new test set)
+    test2_input_df = None
+    if test2_path.exists():
+        test2_df = _normalize_columns(pd.read_csv(test2_path))
+        test2_input_df = test2_df[["prompt", "text"]].copy()
 
     val_machine_df = val_with_label_df[val_with_label_df["label"].astype(int) == 0].copy().reset_index(drop=True)
     val_machine_df.insert(0, "sample_id", [f"eva-{idx + 1:04d}" for idx in range(len(val_machine_df))])
@@ -56,15 +63,23 @@ def prepare_official_data(raw_dir: Path, output_root: Path) -> dict:
     test1_input_df.to_csv(test1_out, index=False)
     val_machine_df.to_csv(eva_val_machine_out, index=False)
 
-    summary_df = pd.DataFrame(
-        [
-            {"file": "val_with_label.csv", "rows": len(val_with_label_df), "purpose": "detection_eval"},
-            {"file": "val_submit_input.csv", "rows": len(val_submit_input_df), "purpose": "detection_submit_input"},
-            {"file": "val_label.csv", "rows": len(val_label_only_df), "purpose": "detection_labels"},
-            {"file": "test1_input.csv", "rows": len(test1_input_df), "purpose": "detection_test1_input"},
-            {"file": "val_machine_only.csv", "rows": len(val_machine_df), "purpose": "evasion_source_seed"},
-        ]
-    )
+    test2_out = None
+    if test2_input_df is not None:
+        test2_out = detection_official_dir / "test2_input.csv"
+        test2_input_df.to_csv(test2_out, index=False)
+
+    summary_rows = [
+        {"file": "val_with_label.csv", "rows": len(val_with_label_df), "purpose": "detection_eval"},
+        {"file": "val_submit_input.csv", "rows": len(val_submit_input_df), "purpose": "detection_submit_input"},
+        {"file": "val_label.csv", "rows": len(val_label_only_df), "purpose": "detection_labels"},
+        {"file": "test1_input.csv", "rows": len(test1_input_df), "purpose": "detection_test1_input"},
+        {"file": "val_machine_only.csv", "rows": len(val_machine_df), "purpose": "evasion_source_seed"},
+    ]
+    if test2_input_df is not None:
+        summary_rows.append(
+            {"file": "test2_input.csv", "rows": len(test2_input_df), "purpose": "detection_test2_input"}
+        )
+    summary_df = pd.DataFrame(summary_rows)
     summary_df.to_csv(manifests_dir / "official_data_inventory.csv", index=False)
 
     return {
@@ -72,5 +87,6 @@ def prepare_official_data(raw_dir: Path, output_root: Path) -> dict:
         "output_root": str(output_root),
         "val_rows": int(len(val_with_label_df)),
         "test1_rows": int(len(test1_input_df)),
+        "test2_rows": int(len(test2_input_df)) if test2_input_df is not None else 0,
         "val_machine_rows": int(len(val_machine_df)),
     }
